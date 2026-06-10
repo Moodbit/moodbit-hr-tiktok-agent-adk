@@ -17,7 +17,7 @@ import subprocess
 import sys
 import time
 from itertools import zip_longest
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Callable, Dict, List, Optional, Tuple
 
 import requests
 import google.auth
@@ -294,6 +294,7 @@ class VideoGeneratorService:
         background: Optional[str] = None,
         is_continuation: bool = False,
         reference_image_paths: Optional[List[str]] = None,
+        progress_callback: Optional[Callable[[str], None]] = None,
     ) -> str:
         safe_script = _sanitize_hr_text(script)
         last_exc: Exception = RuntimeError("No attempts made")
@@ -312,6 +313,8 @@ class VideoGeneratorService:
                 with open(output_path, "wb") as f:
                     f.write(videos[0])
                 print(f"[Veo3] Clip saved: {output_path}")
+                if progress_callback:
+                    progress_callback(f"clip_saved:{os.path.basename(output_path)}")
                 return output_path
             except RuntimeError as exc:
                 last_exc = exc
@@ -326,6 +329,7 @@ class VideoGeneratorService:
         output_dir: str = "tmp_clips",
         merged_output_root: str = "video_raw",
         reuse_last_frame: bool = False,
+        progress_callback: Optional[Callable[[str], None]] = None,
     ) -> str:
         os.makedirs(output_dir, exist_ok=True)
 
@@ -333,6 +337,8 @@ class VideoGeneratorService:
         video_outfit = random.choice(list(_OUTFIT_CATALOG.values()))
         video_background = random.choice(list(_BACKGROUND_CATALOG.values()))
         print(f"[Veo3] Series style — outfit: '{video_outfit[:40]}...', bg: '{video_background[:40]}...'")
+        if progress_callback:
+            progress_callback("series_started")
 
         persona_cache = images[0] if images else None
         reference_images = [persona_cache] if persona_cache else None
@@ -345,6 +351,8 @@ class VideoGeneratorService:
 
             if i == 0:
                 print("[Veo3] Clip 0 — referenceImages mode (no freeze, outfit from text+reference).")
+                if progress_callback:
+                    progress_callback("clip_start:clip_000")
                 self._generate_clip(
                     script,
                     image_path=None,
@@ -353,9 +361,12 @@ class VideoGeneratorService:
                     background=video_background,
                     is_continuation=False,
                     reference_image_paths=reference_images,
+                    progress_callback=progress_callback,
                 )
             else:
                 print(f"[Veo3] Clip {i} — last-frame start (outfit/bg/framing continuity from previous clip).")
+                if progress_callback:
+                    progress_callback(f"clip_start:clip_{i:03d}")
                 self._generate_clip(
                     script,
                     image_path=anchor_image,
@@ -364,6 +375,7 @@ class VideoGeneratorService:
                     background=video_background,
                     is_continuation=True,
                     reference_image_paths=None,
+                    progress_callback=progress_callback,
                 )
             clip_paths.append(clip_path)
 
@@ -383,6 +395,8 @@ class VideoGeneratorService:
             merged = merged_output_root if merged_output_root.endswith(".mp4") else merged_output_root + ".mp4"
             shutil.copy(clip_paths[0], merged)
             print(f"[Veo3] Single clip copied to: {merged}")
+            if progress_callback:
+                progress_callback("merge_done")
             return merged
 
         merged = merged_output_root if merged_output_root.endswith(".mp4") else merged_output_root + ".mp4"
@@ -429,9 +443,13 @@ class VideoGeneratorService:
             merged,
         ]
 
+        if progress_callback:
+            progress_callback("merge_start")
         result = subprocess.run(cmd, capture_output=True, text=True)
         if result.returncode != 0:
             raise RuntimeError(f"[ffmpeg] Merge failed: {result.stderr[:300]}")
 
         print(f"[Veo3] Merged video saved: {merged}")
+        if progress_callback:
+            progress_callback("merge_done")
         return merged

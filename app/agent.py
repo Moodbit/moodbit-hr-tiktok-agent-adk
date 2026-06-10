@@ -22,6 +22,7 @@ from google.adk.agents import LlmAgent
 from google.adk.apps import App
 from google.adk.models import Gemini
 from google.adk.tools import FunctionTool
+from google.adk.tools.long_running_tool import LongRunningFunctionTool
 from google.genai import types
 
 SRC_ROOT = Path(__file__).resolve().parents[1] / "src"
@@ -29,7 +30,7 @@ if SRC_ROOT.exists():
     sys.path.append(str(SRC_ROOT))
 
 from src.tools.content_tools import build_scripts, generate_caption, generate_content
-from src.tools.media_tools import ensure_images, generate_video
+from src.tools.media_tools import ensure_images, generate_video, start_video_job, get_video_job_status
 from src.tools.publish_tools import publish_to_tiktok, upload_video
 
 _, project_id = google.auth.default()
@@ -60,6 +61,16 @@ def ensure_images_tool(count: int) -> list[str]:
 def generate_video_tool(script_parts: list[str], image_paths: list[str]) -> str:
     """Generate and merge video clips into a final MP4."""
     return generate_video(script_parts, image_paths)
+
+
+def start_video_job_tool(script_parts: list[str], image_paths: list[str]) -> dict:
+    """Start a long-running video generation job and return job metadata."""
+    return start_video_job(script_parts, image_paths)
+
+
+def get_video_job_status_tool(job_id: str) -> dict:
+    """Get status and progress for a video generation job."""
+    return get_video_job_status(job_id)
 
 
 def upload_video_tool(video_path: str) -> str:
@@ -98,13 +109,15 @@ media_agent = LlmAgent(
     ),
     instruction=(
         "You generate images and the final video and save it in storage. "
-        "Call ensure_images_tool, then generate_video_tool, then upload_video_tool. "
-        # "Return a JSON object with keys: image_paths, video_path."
+        "Call ensure_images_tool, then start_video_job_tool (long-running). "
+        "While the job is pending, ask the user to wait and call get_video_job_status_tool every few seconds. "
+        "When status is completed, call upload_video_tool with the video_path from result. "
         "Return the result you got including the blob_video_url as hyperlink and ask for the user approval. "
     ),
     tools=[
         FunctionTool(func=ensure_images_tool),
-        FunctionTool(func=generate_video_tool),
+        LongRunningFunctionTool(func=start_video_job_tool),
+        FunctionTool(func=get_video_job_status_tool),
         FunctionTool(func=upload_video_tool),
 
     ],
