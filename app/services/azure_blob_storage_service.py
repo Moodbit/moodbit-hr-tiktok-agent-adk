@@ -39,7 +39,7 @@ class AzureBlobStorageService:
         print(f"[Blob] Uploaded from URL: {blob_client.url}")
         return blob_client.url
 
-    def upload_blob_from_disk(self, file_path: str) -> str:
+    def upload_blob_from_disk(self, file_path: str, blob_name: str | None = None) -> str:
         blob_service_client = BlobServiceClient.from_connection_string(self.connection_string)
 
         if not os.path.exists(file_path):
@@ -56,7 +56,8 @@ class AzureBlobStorageService:
         }
         content_type = mime_types.get(ext, "application/octet-stream")
 
-        blob_name = f"{uuid.uuid4()}-{os.path.basename(file_path)}"
+        safe_blob_name = blob_name.lstrip("/") if blob_name else None
+        blob_name = safe_blob_name or f"{uuid.uuid4()}-{os.path.basename(file_path)}"
 
         with open(file_path, "rb") as fh:
             blob_data = fh.read()

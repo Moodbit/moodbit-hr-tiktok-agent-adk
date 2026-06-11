@@ -21,6 +21,25 @@ def upload_video(video_path: str) -> str:
     return blob_storage.upload_blob_from_disk(video_path)
 
 
+def upload_video_parts(paths: list[str], job_id: str | None = None) -> list[str]:
+    az_conn = os.getenv("AZ_TIKTOK_STORAGE_CONNECTION_STRING")
+    blob_storage = AzureBlobStorageService(conn_string=az_conn, container="tiktok")
+    prefix = f"parts/{job_id}/" if job_id else "parts/"
+    urls: list[str] = []
+    for path in paths:
+        name = os.path.basename(path)
+        urls.append(blob_storage.upload_blob_from_disk(path, blob_name=f"{prefix}{name}"))
+    return urls
+
+
+def upload_video_final(path: str, job_id: str | None = None) -> str:
+    az_conn = os.getenv("AZ_TIKTOK_STORAGE_CONNECTION_STRING")
+    blob_storage = AzureBlobStorageService(conn_string=az_conn, container="tiktok")
+    prefix = f"final/{job_id}/" if job_id else "final/"
+    name = os.path.basename(path)
+    return blob_storage.upload_blob_from_disk(path, blob_name=f"{prefix}{name}")
+
+
 async def _is_url_ready(url: str, retries: int = 10) -> bool:
     for _ in range(retries):
         try:

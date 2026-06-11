@@ -246,6 +246,13 @@ class VideoGeneratorService:
         raise TimeoutError(f"[Veo3] Timed out after {timeout_secs}s for {op_name}")
 
     def _get_duration(self, clip_path: str) -> float:
+        clean_env = os.environ.copy()
+        clean_env.update(
+            {
+                "GRPC_ENABLE_FORK_SUPPORT": "0",
+                "GRPC_POLL_STRATEGY": "poll",
+            }
+        )
         cmd = [
             "ffprobe",
             "-v",
@@ -255,7 +262,7 @@ class VideoGeneratorService:
             "-show_streams",
             clip_path,
         ]
-        result = subprocess.run(cmd, capture_output=True, text=True)
+        result = subprocess.run(cmd, capture_output=True, text=True, env=clean_env)
         if result.returncode != 0:
             return 8.0
         try:
@@ -268,6 +275,13 @@ class VideoGeneratorService:
         return 8.0
 
     def _extract_last_frame(self, clip_path: str, output_path: str) -> str:
+        clean_env = os.environ.copy()
+        clean_env.update(
+            {
+                "GRPC_ENABLE_FORK_SUPPORT": "0",
+                "GRPC_POLL_STRATEGY": "poll",
+            }
+        )
         cmd = [
             "ffmpeg",
             "-y",
@@ -279,7 +293,7 @@ class VideoGeneratorService:
             "1",
             output_path,
         ]
-        result = subprocess.run(cmd, capture_output=True, text=True)
+        result = subprocess.run(cmd, capture_output=True, text=True, env=clean_env)
         if result.returncode != 0:
             raise RuntimeError(f"[ffmpeg] Last-frame extraction failed: {result.stderr[:200]}")
         return output_path
@@ -314,7 +328,7 @@ class VideoGeneratorService:
                     f.write(videos[0])
                 print(f"[Veo3] Clip saved: {output_path}")
                 if progress_callback:
-                    progress_callback(f"clip_saved:{os.path.basename(output_path)}")
+                    progress_callback(f"clip_saved:{output_path}")
                 return output_path
             except RuntimeError as exc:
                 last_exc = exc
@@ -445,7 +459,14 @@ class VideoGeneratorService:
 
         if progress_callback:
             progress_callback("merge_start")
-        result = subprocess.run(cmd, capture_output=True, text=True)
+        clean_env = os.environ.copy()
+        clean_env.update(
+            {
+                "GRPC_ENABLE_FORK_SUPPORT": "0",
+                "GRPC_POLL_STRATEGY": "poll",
+            }
+        )
+        result = subprocess.run(cmd, capture_output=True, text=True, env=clean_env)
         if result.returncode != 0:
             raise RuntimeError(f"[ffmpeg] Merge failed: {result.stderr[:300]}")
 

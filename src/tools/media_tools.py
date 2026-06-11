@@ -10,6 +10,7 @@ from typing import Any, Dict, List
 from app.services.image_generator_service import ImageGeneratorService, BASE_IMAGE_PATH
 from app.services.veo3_generator_service import VideoGeneratorService
 from app.services.video_job_service import VideoJobStore, run_in_background
+from src.tools.publish_tools import upload_video_final, upload_video_parts
 
 
 def ensure_images(count: int) -> List[str]:
@@ -68,7 +69,15 @@ def start_video_job(script_parts: List[str], image_paths: List[str]) -> Dict[str
             images = [anchor] * len(script_parts)
 
             def _progress(msg: str) -> None:
-                job_store.append_progress(job_id, msg)
+                if msg.startswith("clip_saved:"):
+                    clip_path = msg.split(":", 1)[1]
+                    try:
+                        url = upload_video_parts([clip_path], job_id=job_id)[0]
+                        job_store.append_progress(job_id, f"clip_uploaded:{url}")
+                    except Exception as exc:
+                        job_store.append_progress(job_id, f"clip_upload_failed:{exc}")
+                else:
+                    job_store.append_progress(job_id, msg)
 
             output_path = video_service.generate_series_and_merge(
                 scripts=script_parts,
@@ -78,11 +87,27 @@ def start_video_job(script_parts: List[str], image_paths: List[str]) -> Dict[str
                 reuse_last_frame=False,
                 progress_callback=_progress,
             )
+            final_url = upload_video_final(output_path, job_id=job_id)
+            try:
+                os.remove(output_path)
+                job_store.append_progress(job_id, f"final_deleted:{output_path}")
+            except Exception as exc:
+                job_store.append_progress(job_id, f"final_delete_failed:{exc}")
+            for i in range(len(script_parts)):
+                clip_path = os.path.join("tmp_clips", f"clip_{i:03d}.mp4")
+                frame_path = os.path.join("tmp_clips", f"last_frame_{i:03d}.png")
+                for path in (clip_path, frame_path):
+                    if os.path.exists(path):
+                        try:
+                            os.remove(path)
+                            job_store.append_progress(job_id, f"temp_deleted:{path}")
+                        except Exception as exc:
+                            job_store.append_progress(job_id, f"temp_delete_failed:{exc}")
             job_store.update_job(
                 job_id,
                 {
                     "status": "completed",
-                    "result": {"video_path": output_path},
+                    "result": {"video_path": output_path, "final_url": final_url},
                 },
             )
         except Exception as exc:

@@ -31,7 +31,7 @@ if SRC_ROOT.exists():
 
 from src.tools.content_tools import build_scripts, generate_caption, generate_content
 from src.tools.media_tools import ensure_images, generate_video, start_video_job, get_video_job_status
-from src.tools.publish_tools import publish_to_tiktok, upload_video
+from src.tools.publish_tools import publish_to_tiktok
 
 _, project_id = google.auth.default()
 os.environ["GOOGLE_CLOUD_PROJECT"] = project_id
@@ -73,11 +73,6 @@ def get_video_job_status_tool(job_id: str) -> dict:
     return get_video_job_status(job_id)
 
 
-def upload_video_tool(video_path: str) -> str:
-    """Upload a local MP4 to Azure Blob and return the URL."""
-    return upload_video(video_path)
-
-
 def publish_to_tiktok_tool(caption: str, video_url: str) -> str:
     """Publish the video URL to TikTok and return the share id."""
     return publish_to_tiktok(caption, video_url)
@@ -109,16 +104,17 @@ media_agent = LlmAgent(
     ),
     instruction=(
         "You generate images and the final video and save it in storage. "
-        "Call ensure_images_tool, then start_video_job_tool (long-running). "
-        "While the job is pending, ask the user to wait and call get_video_job_status_tool every few seconds. "
-        "When status is completed, call upload_video_tool with the video_path from result. "
-        "Return the result you got including the blob_video_url as hyperlink and ask for the user approval. "
+        "1. Call ensure_images_tool. "
+        "2. Call start_video_job_tool to initiate generation and get the job_id. "
+        "3. STOP and tell the user: 'I have started your video generation! It usually takes a few minutes. Please reply with \"check status\" when you want me to check the progress.' "
+        "4. When the user asks to check the status, call get_video_job_status_tool with the job_id. "
+        "5. If the status is still pending, ask them to wait a bit longer. "
+        "6. If the status is completed, use the final_url from the job result, return it as a hyperlink, and ask for user approval to publish."
     ),
     tools=[
         FunctionTool(func=ensure_images_tool),
         LongRunningFunctionTool(func=start_video_job_tool),
         FunctionTool(func=get_video_job_status_tool),
-        FunctionTool(func=upload_video_tool),
 
     ],
 )
