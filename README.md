@@ -1,22 +1,26 @@
-# hr-tiktok-adk
+# Moodbit HR TikTok Agent
 
 Standalone HR TikTok automation agent built with Google ADK.
-Recreates the original pipeline without importing from the legacy repo.
+Generates HR scripts, images, multi-clip videos, uploads assets to Azure Blob Storage,
+and publishes to TikTok via the Business API. Video generation runs as a long-running
+job with progress streaming and Firestore-backed persistence for Cloud Run autoscaling.
 
 ## Project Structure
 
 ```
 hr-tiktok-adk/
-├── app/         # Core agent code
+├── app/                       # Core agent code
 │   ├── agent.py               # ADK agent and tool wiring
+│   ├── fast_api_app.py        # FastAPI entrypoint (ADK web)
+│   ├── services_registry.py   # Firestore session service registration
 │   ├── tiktok_influencer.py   # Orchestrator pipeline
-│   ├── scheduler.py           # Schedule helpers
 │   ├── controllers/           # Content generation
 │   ├── services/              # External services (TikTok, Azure, Veo, TTS, image gen)
 │   ├── ima/                    # Persona reference image
 │   └── app_utils/             # App utilities and helpers
-├── tests/                     # Unit, integration, and load tests
-├── GEMINI.md                  # AI-assisted development guide
+├── src/                       # Tool implementations
+├── tests/                     # Unit and integration tests
+├── AGENTS.md                  # Agents CLI workflow guide
 └── pyproject.toml             # Project dependencies
 ```
 
@@ -48,32 +52,32 @@ Test the agent with a local web server:
 
 ```bash
 agents-cli playground
+```
 
 ## Core Capabilities
 
-- Generate and post HR TikTok videos across 4 content types (news, phrase, activity, tip)
-- Generate persona images (Gemini), voiceover (Gemini TTS), and video clips (Veo 3)
-- Upload to Azure Blob Storage and publish via TikTok Business API
+- Generate and post HR TikTok videos across 3 content types (phrase, activity, tip)
+- Generate persona images (Gemini) and video clips with audio (Veo 3)
+- Upload clips and final video to Azure Blob Storage, then publish via TikTok Business API
+- Long-running video generation with Firestore-backed job tracking + progress streaming
 - Manual pipeline runs only (no scheduler)
 
 ## Environment Variables
 
 | Variable | Description |
 | --- | --- |
-| `BING_SEARCH_V7_SUBSCRIPTION_KEY` | Bing Search API key |
-| `BING_SEARCH_V7_ENDPOINT` | Bing Search endpoint URL |
 | `GCP_PROJECT_ID` | GCP project ID for Vertex AI |
 | `GEMINI_API_KEY` | Google Gemini API key (image gen fallback) |
-| `GEMINI_TTS_API_KEY` | Google Gemini API key (TTS fallback) |
 | `AZ_TIKTOK_STORAGE_CONNECTION_STRING` | Azure Storage connection string for TikTok videos |
-| `AZURE_STORAGE_KEY` | Azure Storage account key for schedule JSON |
-| `AZURE_FILE_POSTS_DATE` | Azure Blob URL to schedule JSON |
 | `TIKTOK_AUTH_JSON` | JSON string containing TikTok auth tokens |
 | `TIKTOK_CLIENT_KEY` | TikTok app client key |
 | `TIKTOK_CLIENT_SECRET` | TikTok app client secret |
-| `TTS_PARTS` | Number of script parts per video (default `3`) |
-| `TTS_MAX_WORDS` | Max words per script part (default `35`) |
 | `SKIP_IMAGE_GEN` | If `1`, skip image generation and use base image |
+| `ADK_SESSION_SERVICE_URI` | Session backend URI (use `firestore://<collection>` for Cloud Run) |
+| `ADK_FIRESTORE_ROOT_COLLECTION` | Root collection for ADK sessions (used by Firestore backend) |
+| `ADK_VIDEO_JOBS_COLLECTION` | Firestore collection for video jobs (default `video_jobs`) |
+| `ALLOW_ORIGINS` | Comma-separated CORS origins for the API |
+| `LOGS_BUCKET_NAME` | GCS bucket name for ADK artifacts/logs |
 
 ## Persona Image
 
@@ -82,9 +86,15 @@ Place your persona reference photo at:
 ```
 app/ima/Imagebase.png
 ```
-```
 
-You can also use features from the [ADK](https://adk.dev/) CLI with `uv run adk`.
+## Firestore Session Storage (Cloud Run)
+
+Set the session backend and collection when deploying:
+
+- `ADK_SESSION_SERVICE_URI=firestore://sessions`
+- `ADK_FIRESTORE_ROOT_COLLECTION=sessions`
+
+The Firestore registry is loaded via `app/services_registry.py`.
 
 ## Commands
 
