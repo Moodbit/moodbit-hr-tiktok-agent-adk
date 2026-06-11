@@ -24,6 +24,37 @@ hr-tiktok-adk/
 └── pyproject.toml             # Project dependencies
 ```
 
+## Architecture Diagram
+
+```mermaid
+flowchart TB
+	U[User] -->|API requests| FA[FastAPI ADK Web App]
+	FA --> ADK[ADK App / Root Agent]
+
+	ADK --> CA[Content Agent]
+	ADK --> MA[Media Agent]
+	ADK --> PA[Publish Agent]
+
+	CA --> CT[Content Tools]
+	CT --> HC[HR Content Controllers]
+	HC --> LLM[Gemini (google-genai)]
+
+	MA --> MT[Media Tools]
+	MT --> IMG[Image Generator Service]
+	MT --> VID[Video Generator Service (Veo)]
+	MT --> JOBS[Video Job Store]
+	JOBS --> FS[Firestore]
+
+	MA --> AZU[Azure Blob Storage]
+
+	PA --> PT[Publish Tools]
+	PT --> TT[TikTok Business API]
+	PT --> AZU
+
+	FA --> LOGS[Cloud Logging / OTEL]
+	FA --> FS
+```
+
 > 💡 **Tip:** Use [Gemini CLI](https://github.com/google-gemini/gemini-cli) for AI-assisted development - project context is pre-configured in `GEMINI.md`.
 
 ## Requirements
