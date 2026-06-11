@@ -22,6 +22,7 @@ from google.cloud import logging as google_cloud_logging
 
 from app.app_utils.telemetry import setup_telemetry
 from app.app_utils.typing import Feedback
+from app import services_registry  # noqa: F401
 
 setup_telemetry()
 logger = logging.getLogger(__name__)
