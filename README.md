@@ -30,26 +30,30 @@ hr-tiktok-adk/
 flowchart TB
 	U[User] -->|API requests| FA[FastAPI ADK Web App]
 	FA --> ADK[ADK App / Root Agent]
-
 	ADK --> CA[Content Agent]
 	ADK --> MA[Media Agent]
 	ADK --> PA[Publish Agent]
 
 	CA --> CT[Content Tools]
-	CT --> HC[HR Content Controllers]
-	HC --> LLM[Gemini (google-genai)]
+	CT --> GC[generate_content]
+	CT --> BS[build_scripts]
+	CT --> CC[generate_caption]
+	GC --> HC[HR Content Controllers]
+	HC --> LLM[Gemini / google-genai]
 
 	MA --> MT[Media Tools]
-	MT --> IMG[Image Generator Service]
-	MT --> VID[Video Generator Service (Veo)]
-	MT --> JOBS[Video Job Store]
+	MT --> EI[ensure_images]
+	MT --> SVJ[start_video_job]
+	MT --> GJS[get_video_job_status]
+	EI --> IMG[Image Generator Service]
+	SVJ --> VID[Video Generator Service / Veo]
+	SVJ --> JOBS[Video Job Store]
 	JOBS --> FS[Firestore]
-
-	MA --> AZU[Azure Blob Storage]
+	SVJ --> AZU[Azure Blob Storage]
 
 	PA --> PT[Publish Tools]
-	PT --> TT[TikTok Business API]
-	PT --> AZU
+	PT --> PTT[publish_to_tiktok]
+	PTT --> TT[TikTok Business API]
 
 	FA --> LOGS[Cloud Logging / OTEL]
 	FA --> FS
